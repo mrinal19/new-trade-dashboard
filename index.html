@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Professional Trading Dashboard</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+<link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
+   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-left">
+            <h1><i class="fas fa-chart-line"></i> Trading Pro</h1>
+            <div class="connection-status" id="connectionStatus">
+                <i class="fas fa-circle"></i>
+                <span>Connecting...</span>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="balance-summary">
+                <div class="balance-item">
+                    <span class="label">Total Balance</span>
+                    <span class="value" id="totalBalance">$0.00</span>
+                </div>
+                <div class="balance-item">
+                    <span class="label">Available</span>
+                    <span class="value" id="availableBalance">$0.00</span>
+                </div>
+                <div class="balance-item">
+                    <span class="label">PnL</span>
+                    <span class="value pnl" id="unrealizedPnl">$0.00</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <div class="main-container">
+        <!-- Left Sidebar -->
+        <div class="sidebar">
+            <!-- Symbol Selector -->
+            <div class="widget symbol-selector">
+                <h3>Trading Pair</h3>
+                <select id="symbolSelect">
+                    <option value="BTCUSDT">BTC/USDT</option>
+                    <option value="ETHUSDT">ETH/USDT</option>
+                    <option value="BNBUSDT">BNB/USDT</option>
+                    <option value="ADAUSDT">ADA/USDT</option>
+                    <option value="SOLUSDT">SOL/USDT</option>
+                </select>
+            </div>
+
+            <!-- Price Ticker -->
+            <div class="widget price-ticker">
+                <div class="price-main">
+                    <span class="price" id="currentPrice">$0.00</span>
+                    <span class="price-change" id="priceChange">+0.00%</span>
+                </div>
+                <div class="price-stats">
+                    <div class="stat">
+                        <span class="label">24h High</span>
+                        <span class="value" id="high24h">$0.00</span>
+                    </div>
+                    <div class="stat">
+                        <span class="label">24h Low</span>
+                        <span class="value" id="low24h">$0.00</span>
+                    </div>
+                    <div class="stat">
+                        <span class="label">Volume</span>
+                        <span class="value" id="volume24h">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Order Form -->
+            <div class="widget order-form">
+                <div class="order-tabs">
+                    <button class="tab-btn active" data-side="BUY">Buy</button>
+                    <button class="tab-btn" data-side="SELL">Sell</button>
+                </div>
+                
+                <div class="order-type-selector">
+                    <select id="orderType">
+                        <option value="MARKET">Market</option>
+                        <option value="LIMIT">Limit</option>
+                        <option value="STOP_LIMIT">Stop Limit</option>
+                        <option value="TWAP">TWAP</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Quantity</label>
+                    <input type="number" id="quantity" step="0.001" min="0">
+                </div>
+
+                <div class="form-group" id="priceGroup">
+                    <label>Price</label>
+                    <input type="number" id="price" step="0.01" min="0">
+                </div>
+
+                <div class="form-group" id="stopPriceGroup" style="display: none;">
+                    <label>Stop Price</label>
+                    <input type="number" id="stopPrice" step="0.01" min="0">
+                </div>
+
+                <div class="form-group" id="twapGroup" style="display: none;">
+                    <label>Duration (minutes)</label>
+                    <input type="number" id="twapDuration" value="10" min="1">
+                </div>
+
+                <button class="order-btn buy-btn" id="placeOrderBtn">
+                    <i class="fas fa-arrow-up"></i>
+                    Place Buy Order
+                </button>
+            </div>
+        </div>
+
+        <!-- Center Content -->
+        <div class="center-content">
+            <!-- Chart Container -->
+            <div class="widget chart-container">
+                <div class="chart-header">
+                    <h3>Price Chart</h3>
+                    <div class="chart-controls">
+                        <button class="chart-btn active" data-interval="1m">1m</button>
+                        <button class="chart-btn" data-interval="5m">5m</button>
+                        <button class="chart-btn" data-interval="15m">15m</button>
+                        <button class="chart-btn" data-interval="1h">1h</button>
+                        <button class="chart-btn" data-interval="4h">4h</button>
+                        <button class="chart-btn" data-interval="1d">1d</button>
+                    </div>
+                </div>
+                <div class="chart-wrapper">
+                    <canvas id="priceChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Current Orders -->
+            <div class="widget orders-container">
+                <div class="orders-header">
+                    <h3>Open Orders</h3>
+                    <button class="refresh-btn" id="refreshOrders">
+                        <i class="fas fa-refresh"></i>
+                    </button>
+                </div>
+                <div class="orders-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Side</th>
+                                <th>Type</th>
+                                <th>Quantity</th>
+                                <th>Price</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ordersTableBody">
+                            <tr class="no-data">
+                                <td colspan="7">No open orders</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Sidebar -->
+        <div class="right-sidebar">
+            <!-- Order Book -->
+            <div class="widget orderbook">
+                <h3>Order Book</h3>
+                <div class="orderbook-container">
+                    <div class="asks" id="orderbookAsks">
+                        <!-- Sell orders will be populated here -->
+                    </div>
+                    <div class="spread">
+                        <span id="spreadValue">Spread: $0.00</span>
+                    </div>
+                    <div class="bids" id="orderbookBids">
+                        <!-- Buy orders will be populated here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Trades -->
+            <div class="widget recent-trades">
+                <h3>Recent Trades</h3>
+                <div class="trades-container" id="recentTrades">
+                    <!-- Recent trades will be populated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Section -->
+    <div class="bottom-section">
+        <!-- Order History -->
+        <div class="widget order-history">
+            <div class="section-header">
+                <h3>Order History</h3>
+                <div class="filter-controls">
+                    <select id="historyFilter">
+                        <option value="all">All Orders</option>
+                        <option value="filled">Filled</option>
+                        <option value="cancelled">Cancelled</option>
+                    </select>
+                </div>
+            </div>
+            <div class="history-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Symbol</th>
+                            <th>Side</th>
+                            <th>Type</th>
+                            <th>Quantity</th>
+                            <th>Price</th>
+                            <th>Status</th>
+                            <th>PnL</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyTableBody">
+                        <tr class="no-data">
+                            <td colspan="8">No order history</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Portfolio Summary -->
+        <div class="widget portfolio-summary">
+            <h3>Portfolio</h3>
+            <div class="portfolio-grid">
+                <div class="portfolio-item">
+                    <span class="asset">USDT</span>
+                    <span class="balance" id="usdtBalance">0.00</span>
+                </div>
+                <div class="portfolio-item">
+                    <span class="asset">BTC</span>
+                    <span class="balance" id="btcBalance">0.00000000</span>
+                </div>
+                <div class="portfolio-item">
+                    <span class="asset">ETH</span>
+                    <span class="balance" id="ethBalance">0.00000000</span>
+                </div>
+                <div class="portfolio-item">
+                    <span class="asset">Total Value</span>
+                    <span class="balance total-value" id="totalValue">$0.00</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>Processing...</p>
+        </div>
+    </div>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
+<script type="module" src="{{ url_for('static', filename='main.js') }}"></script>
+</body>
+</html>
